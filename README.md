@@ -8,6 +8,8 @@ MORSE is a tiny chip that decodes Morse code. Tap dots and dashes on one button,
 - Design: [`src/project.v`](src/project.v)
 - Tests: [`test/test.py`](test/test.py) (10 cocotb tests covering all 36 characters, errors, clear, slow mode, sidetone and debounce)
 
+<img width="1587" height="2245" alt="image" src="https://github.com/user-attachments/assets/1f43611a-22ff-4749-8c7d-4d6d770cfe93" />
+
 ## Pinout
 
 | Pin       | Direction | Function                                       |
