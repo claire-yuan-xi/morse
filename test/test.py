@@ -1,11 +1,10 @@
-# SPDX-FileCopyrightText: © 2026 Claire Yuan
+# SPDX-FileCopyrightText: 2026 Claire Yuan
 # SPDX-License-Identifier: Apache-2.0
 
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
-# Morse table: character -> (morse, 7-segment pattern)
 MORSE = {
     "A": (".-", 0x77),   "B": ("-...", 0x7C), "C": ("-.-.", 0x39), "D": ("-..", 0x5E),
     "E": (".", 0x79),    "F": ("..-.", 0x71), "G": ("--.", 0x3D),  "H": ("....", 0x76),
@@ -19,9 +18,9 @@ MORSE = {
     "8": ("---..", 0x7F), "9": ("----.", 0x6F),
 }
 
-CLOCKS_PER_MS = 10  # 10 kHz clock
+CLOCKS_PER_MS = 10  # 10khz
 
-# Press/pause lengths used by the tests (normal speed, in ms)
+# ms
 DOT_MS = 80
 DASH_MS = 300
 SYMBOL_GAP_MS = 100
@@ -33,14 +32,14 @@ async def wait_ms(dut, ms):
 
 
 async def key(dut, ms):
-    """Hold the Morse key down for `ms` milliseconds, then release it."""
+    # hold key for ms
     dut.ui_in.value = int(dut.ui_in.value) | 0x01
     await wait_ms(dut, ms)
     dut.ui_in.value = int(dut.ui_in.value) & ~0x01
 
 
 async def send(dut, morse, scale=1):
-    """Tap out one Morse letter and wait for the chip to decode it."""
+    # send one letter + wait for decode
     for i, sym in enumerate(morse):
         await key(dut, (DOT_MS if sym == "." else DASH_MS) * scale)
         if i < len(morse) - 1:
@@ -61,7 +60,7 @@ def strobe(dut):
 
 
 async def setup(dut):
-    clock = Clock(dut.clk, 100, unit="us")  # 10 kHz
+    clock = Clock(dut.clk, 100, unit="us")  
     cocotb.start_soon(clock.start())
     dut.ena.value = 1
     dut.ui_in.value = 0
@@ -74,7 +73,7 @@ async def setup(dut):
 
 @cocotb.test()
 async def test_reset_blank(dut):
-    """After reset the display is blank and all uio pins are outputs."""
+    # blank after reset
     await setup(dut)
     assert seg(dut) == 0x00
     assert ascii_out(dut) == " "
@@ -83,7 +82,7 @@ async def test_reset_blank(dut):
 
 @cocotb.test()
 async def test_sos(dut):
-    """Send S-O-S and check each letter and the new-letter strobe."""
+    # sos
     await setup(dut)
     last = strobe(dut)
     for ch in "SOS":
@@ -91,13 +90,13 @@ async def test_sos(dut):
         dut._log.info(f"Decoded {ascii_out(dut)!r}")
         assert ascii_out(dut) == ch
         assert seg(dut) == MORSE[ch][1]
-        assert strobe(dut) != last, "strobe should flip on every new letter"
+        assert strobe(dut) != last
         last = strobe(dut)
 
 
 @cocotb.test()
 async def test_all_characters(dut):
-    """Every letter A-Z and digit 0-9 decodes correctly."""
+    # a-z, 0-9
     await setup(dut)
     for ch, (morse, pattern) in MORSE.items():
         await send(dut, morse)
@@ -107,18 +106,18 @@ async def test_all_characters(dut):
 
 @cocotb.test()
 async def test_letter_waits_for_gap(dut):
-    """The letter isn't shown until the pause is long enough."""
+    # letter only shows after the gap
     await setup(dut)
     await key(dut, DOT_MS)
-    await wait_ms(dut, 300)          # shorter than the 500 ms letter gap
+    await wait_ms(dut, 300)          # < 500ms gap
     assert ascii_out(dut) == " "
-    await wait_ms(dut, 300)          # now past 500 ms
+    await wait_ms(dut, 300)          # > 500ms
     assert ascii_out(dut) == "E"
 
 
 @cocotb.test()
 async def test_invalid_code(dut):
-    """A pattern that isn't a letter (..--) shows '-' and ASCII '?'."""
+    # ..-- isnt a letter
     await setup(dut)
     await send(dut, "..--")
     assert ascii_out(dut) == "?"
@@ -127,18 +126,18 @@ async def test_invalid_code(dut):
 
 @cocotb.test()
 async def test_too_many_symbols(dut):
-    """Six or more symbols is an error."""
+    # 6 symbols = error
     await setup(dut)
     await send(dut, "......")
     assert ascii_out(dut) == "?"
-    # ...and the chip recovers for the next letter
+    # should recover
     await send(dut, MORSE["A"][0])
     assert ascii_out(dut) == "A"
 
 
 @cocotb.test()
 async def test_clear_button(dut):
-    """ui[2] clears the display."""
+    # clear button
     await setup(dut)
     await send(dut, MORSE["K"][0])
     assert ascii_out(dut) == "K"
@@ -152,29 +151,29 @@ async def test_clear_button(dut):
 
 @cocotb.test()
 async def test_slow_mode(dut):
-    """With ui[1] high everything takes twice as long."""
+    # slow mode
     await setup(dut)
     dut.ui_in.value = 0x02
     await ClockCycles(dut.clk, 30)
-    # A 300 ms press would be a dash at normal speed but is a dot in slow mode
+    # 300ms is a dot in slow mode
     await key(dut, 300)
     await wait_ms(dut, 200)
-    await key(dut, 700)               # dash in slow mode (>= 400 ms)
-    await wait_ms(dut, 1200)          # slow-mode letter gap is 1000 ms
+    await key(dut, 700)               # dash in slow mode
+    await wait_ms(dut, 1200)          # slow gap is 1000ms
     assert ascii_out(dut) == "A"
 
 
 @cocotb.test()
 async def test_sidetone(dut):
-    """uo[7] toggles while the key is held and stays low when released."""
+    # beep on uo[7]
     await setup(dut)
     dut.ui_in.value = 0x01
-    await wait_ms(dut, 20)            # let the debouncer accept the press
+    await wait_ms(dut, 20)            # wait for debounce
     values = set()
     for _ in range(40):
         await ClockCycles(dut.clk, 1)
         values.add(int(dut.uo_out.value) >> 7)
-    assert values == {0, 1}, "tone should be toggling"
+    assert values == {0, 1}
     dut.ui_in.value = 0x00
     await wait_ms(dut, 20)
     for _ in range(40):
@@ -184,7 +183,7 @@ async def test_sidetone(dut):
 
 @cocotb.test()
 async def test_debounce(dut):
-    """A 1 ms glitch on the key is ignored."""
+    # 1ms glitch ignored
     await setup(dut)
     await key(dut, 1)
     await wait_ms(dut, LETTER_GAP_MS)

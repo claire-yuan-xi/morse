@@ -1,5 +1,5 @@
 [*]
-[*] GTKWave save file for the Morse code decoder
+[*] GTKWave Analyzer v3.4.0
 [*]
 [dumpfile] "tb.fst"
 [savefile] "tb.gtkw"

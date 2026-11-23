@@ -27,7 +27,7 @@ module tb ();
   wire VGND = 1'b0;
 `endif
 
-  // Our Morse decoder:
+  // Replace tt_um_example with your module name:
   tt_um_claire_yuan_xi_morse user_project (
 
       // Include power ports for the Gate Level test:
